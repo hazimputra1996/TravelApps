@@ -1,0 +1,113 @@
+// Placeholder schema (will be expanded in Todo 2)
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Trip {
+  id          String           @id @default(uuid())
+  name        String
+  description String?          @db.Text
+  startDate   DateTime?        @db.Date
+  endDate     DateTime?        @db.Date
+  currency    String           @default("MYR")
+  budgetMYR   Decimal?         @db.Decimal(18,2)
+  perDiemMYR  Decimal?         @db.Decimal(18,2)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  items       ItineraryItem[]
+  categories  CategoryOnTrip[]
+  categoryBudgets CategoryBudget[]
+  templates   ItemTemplate[]
+}
+
+model Category {
+  id          String           @id @default(uuid())
+  name        String
+  createdAt   DateTime         @default(now())
+  custom      Boolean          @default(false)
+  trips       CategoryOnTrip[]
+  items       ItineraryItem[]  @relation("ItemCategory")
+  categoryBudgets CategoryBudget[]
+  templates   ItemTemplate[]
+  @@unique([name])
+}
+
+model CategoryOnTrip {
+  tripId     String
+  categoryId String
+  trip       Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  @@id([tripId, categoryId])
+}
+
+model ItineraryItem {
+  id             String    @id @default(uuid())
+  tripId         String
+  trip           Trip      @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  title          String
+  dateTime       DateTime
+  expectedCost   Decimal?  @db.Decimal(18,4)
+  actualCost     Decimal?  @db.Decimal(18,4)
+  currency       String
+  // User-provided FX rate: 1 unit of 'currency' = exchangeRate MYR
+  exchangeRate   Decimal?  @db.Decimal(18,8)
+  autoFx         Boolean   @default(false) // true if exchangeRate was auto-fetched
+  myrExpected    Decimal?  @db.Decimal(18,4)
+  myrActual      Decimal?  @db.Decimal(18,4)
+  categoryId     String?   // reference Category in global list (not per-trip join)
+  category       Category? @relation("ItemCategory", fields: [categoryId], references: [id])
+  location       String?
+  notes          String?   @db.Text
+  status         String    @default("Planned")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+}
+
+model CategoryBudget {
+  id         String   @id @default(uuid())
+  tripId     String
+  categoryId String
+  trip       Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  limitMYR   Decimal  @db.Decimal(18,2)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  @@unique([tripId, categoryId])
+}
+
+model ItemTemplate {
+  id           String    @id @default(uuid())
+  tripId       String
+  trip         Trip      @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  title        String
+  defaultStatus String?  @default("Planned")
+  expectedCost Decimal?  @db.Decimal(18,4)
+  currency     String    @default("MYR")
+  exchangeRate Decimal?  @db.Decimal(18,8)
+  autoFx       Boolean   @default(false)
+  categoryId   String?
+  category     Category? @relation(fields: [categoryId], references: [id])
+  location     String?
+  notes        String?   @db.Text
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+// Manual override for a specific date (UTC date) and currency.
+// When present, this rate (1 CURRENCY = rate MYR) is used instead of live fetch for items whose dateTime falls on that date.
+model FxRateOverride {
+  id        String   @id @default(uuid())
+  date      DateTime @db.Date
+  currency  String
+  rate      Decimal  @db.Decimal(18,8)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([date, currency])
+}
+

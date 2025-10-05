@@ -14,7 +14,8 @@ COPY src ./src
 RUN npm run build
 
 COPY docker-entrypoint.sh ./
-RUN chmod +x docker-entrypoint.sh
+# Normalize potential CRLF line endings (Windows) to LF to avoid exec format errors
+RUN sed -i 's/\r$//' docker-entrypoint.sh && chmod +x docker-entrypoint.sh
 
 EXPOSE 4000
 ENTRYPOINT ["./docker-entrypoint.sh"]
